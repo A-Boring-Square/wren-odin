@@ -51,26 +51,26 @@ Handle :: struct {}
 //
 // - To free memory, [memory] will be the memory to free and [newSize] will be
 //   zero. It should return nil.
-ReallocateFn :: #type proc(memory: rawptr, newSize: c.size_t, userData: rawptr) -> rawptr
+ReallocateFn :: #type proc "c" (memory: rawptr, newSize: c.size_t, userData: rawptr) -> rawptr
 
 // A function callable from Wren code, but implemented in C.
-ForeignMethodFn :: #type proc(vm: ^VM)
+ForeignMethodFn :: #type proc "c" (vm: ^VM)
 
 // A finalizer function for freeing resources owned by an instance of a foreign
 // class. Unlike most foreign methods, finalizers do not have access to the VM
 // and should not interact with it since it's in the middle of a garbage
 // collection.
-FinalizerFn :: #type proc(data: rawptr)
+FinalizerFn :: #type proc "c" (data: rawptr)
 
 // Gives the host a chance to canonicalize the imported module name,
 // potentially taking into account the (previously resolved) name of the module
 // that contains the import. Typically, this is used to implement relative
 // imports.
-ResolveModuleFn :: #type proc(vm: ^VM, importer: cstring, name: cstring)
+ResolveModuleFn :: #type proc "c" (vm: ^VM, importer: cstring, name: cstring)
 
 // Called after loadModuleFn is called for module [name]. The original returned result
 // is handed back to you in this callback, so that you can free memory if appropriate.
-LoadModuleCompleteFn :: #type proc(vm: ^VM, name: cstring, result: LoadModuleResult);
+LoadModuleCompleteFn :: #type proc "c" (vm: ^VM, name: cstring, result: LoadModuleResult);
 
 // The result of a loadModuleFn call. 
 // [source] is the source code for the module, or NULL if the module is not found.
@@ -82,11 +82,11 @@ onComplete: LoadModuleCompleteFn,
 }
 
 // Loads and returns the source code for the module [name].
-WrenLoadModuleFn :: #type proc(vm: ^VM, name: cstring) -> LoadModuleResult
+LoadModuleFn :: #type proc "c" (vm: ^VM, name: cstring) -> LoadModuleResult
 
 // Returns a pointer to a foreign method on [className] in [module] with
 // [signature].
-BindForeignMethodFn :: #type proc(
+BindForeignMethodFn :: #type proc "c" (
     vm: ^VM,const,
     module: cstring,
     className: cstring,
@@ -95,18 +95,18 @@ BindForeignMethodFn :: #type proc(
 ) -> ForeignMethodFn
 
 // Displays a string of text to the user.
-WriteFn :: #type proc(vm: ^VM, text: cstring)
+WriteFn :: #type proc "c" (vm: ^VM, text: cstring)
 
 
-ErrorType :: enum {
+ErrorType :: enum c.int {
   // A syntax or resolution error detected at compile time.
-  WREN_ERROR_COMPILE,
+  ERROR_COMPILE,
 
   // The error message for a runtime error.
-  WREN_ERROR_RUNTIME,
+  ERROR_RUNTIME,
 
   // One entry of a runtime error's stack trace.
-  WREN_ERROR_STACK_TRACE
+  ERROR_STACK_TRACE
 }
 
 
@@ -117,12 +117,12 @@ ErrorType :: enum {
 // where the error occurs, and the compiler's error [message].
 //
 // A runtime error is reported by calling this once with [type]
-// `WREN_ERROR_RUNTIME`, no [module] or [line], and the runtime error's
-// [message]. After that, a series of [type] `WREN_ERROR_STACK_TRACE` calls are
+// `ERROR_RUNTIME`, no [module] or [line], and the runtime error's
+// [message]. After that, a series of [type] `ERROR_STACK_TRACE` calls are
 // made for each line in the stack trace. Each of those has the resolved
 // [module] and [line] where the method or function is defined and [message] is
 // the name of the method or function.
-ErrorFn :: #type proc(
+ErrorFn :: #type proc "c" (
     vm: ^VM,
     type: ErrorType, 
     module: cstring, 
@@ -146,7 +146,7 @@ ForeignClassMethods :: struct {
 
 // Returns a pair of pointers to the foreign methods used to allocate and
 // finalize the data for instances of [className] in resolved [module].
-BindForeignClassFn :: #type proc(vm: ^VM, module: cstring, className: cstring) -> ForeignClassMethods
+BindForeignClassFn :: #type proc "c" (vm: ^VM, module: cstring, className: cstring) -> ForeignClassMethods
 
 
 Configuration :: struct {
@@ -196,7 +196,7 @@ Configuration :: struct {
   //
   // If a module with the given name could not be found by the embedder, it
   // should return nil and Wren will report that as a runtime error.
-  loadModuleFn: WrenLoadModuleFn,
+  loadModuleFn: LoadModuleFn,
 
   // The callback Wren uses to find a foreign method and bind it to a class.
   //
@@ -246,7 +246,7 @@ Configuration :: struct {
   // back to a usable size.
   //
   // If zero, defaults to 1MB.
-  iminHeapSize: c.size_t,
+  minHeapSize: c.size_t,
 
   // Wren will resize the heap automatically as the number of bytes
   // remaining in use after a collection changes. This number determines the
@@ -279,17 +279,17 @@ InterpretResult :: enum {
 //
 // This is not necessarily the object's *class*, but instead its low level
 // representation type.
-Type :: enum {
-  WREN_TYPE_BOOL,
-  WREN_TYPE_NUM,
-  WREN_TYPE_FOREIGN,
-  WREN_TYPE_LIST,
-  WREN_TYPE_MAP,
-  WREN_TYPE_NULL,
-  WREN_TYPE_STRING,
+Type :: enum c.int {
+  YPE_BOOL,
+  TYPE_NUM,
+  TYPE_FOREIGN,
+  TYPE_LIST,
+  TYPE_MAP,
+  TYPE_NULL,
+  TYPE_STRING,
 
   // The object is of a type that isn't accessible by the C API.
-  WREN_TYPE_UNKNOWN
+  TYPE_UNKNOWN
 }
 
 when ODIN_OS == .Windows {
@@ -461,7 +461,7 @@ foreign wren_lib {
     // number of bytes in the array.
     //
     // It is an error to call this if the slot does not contain a string.
-    GetSlotBytes :: proc(vm: ^VM, slot: c.int, length: ^c.int) -> []byte ---
+    GetSlotBytes :: proc(vm: ^VM, slot: c.int, length: ^c.int) -> ^[]byte ---
 
     // Reads a number from [slot].
     //
@@ -497,7 +497,7 @@ foreign wren_lib {
     //
     // The bytes are copied to a new string within Wren's heap, so you can free
     // memory used by them after this is called.
-    SetSlotBytes :: proc(vm: ^VM, slot: c.int, bytes: []byte, length: c.size_t) ---
+    SetSlotBytes :: proc(vm: ^VM, slot: c.int, bytes: ^[]byte, length: c.size_t) ---
 
     // Stores the numeric [value] in [slot].
     SetSlotDouble :: proc(vm: ^VM, slot: c.int, value: c.double) ---
