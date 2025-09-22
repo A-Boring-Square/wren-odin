@@ -66,7 +66,7 @@ FinalizerFn :: #type proc "c" (data: rawptr)
 // potentially taking into account the (previously resolved) name of the module
 // that contains the import. Typically, this is used to implement relative
 // imports.
-ResolveModuleFn :: #type proc "c" (vm: ^VM, importer: cstring, name: cstring)
+ResolveModuleFn :: #type proc "c" (vm: ^VM, importer: cstring, name: cstring) -> cstring
 
 // Called after loadModuleFn is called for module [name]. The original returned result
 // is handed back to you in this callback, so that you can free memory if appropriate.
