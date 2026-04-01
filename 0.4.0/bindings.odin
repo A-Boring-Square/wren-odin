@@ -280,7 +280,7 @@ InterpretResult :: enum {
 // This is not necessarily the object's *class*, but instead its low level
 // representation type.
 Type :: enum c.int {
-  YPE_BOOL,
+  TYPE_BOOL,
   TYPE_NUM,
   TYPE_FOREIGN,
   TYPE_LIST,
